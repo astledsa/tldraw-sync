@@ -10,9 +10,16 @@ let db = new Map<string, Y.Doc>();
 db.set("1", ydoc1);
 
 export default class WebSocketServer implements Party.Server {
-    constructor(readonly room: Party.Room) {}
+    private serverLog: {user: string, timestamp: number, diffUpdate: Uint8Array}[];
+
+    constructor(readonly room: Party.Room) {
+        this.serverLog = [];
+    }
 
     onConnect(connection: Party.Connection) {
+
+        // As soon as a user connects, send the last update in the Log
+        connection.send(JSON.stringify(this.serverLog[this.serverLog.length - 1].diffUpdate));
         
     }
 
@@ -30,5 +37,12 @@ export default class WebSocketServer implements Party.Server {
         } else {
             console.error ("Error in merging changes to the Db");
         }
+
+        // Update the log
+        this.serverLog.push({
+            user: sender.id,
+            timestamp: Date.now(),
+            diffUpdate: mes
+        })
     }
 }

@@ -3,12 +3,13 @@ import PartySocket from "partysocket";
 import board from "./mainBaord.json";
 import { JSONToYDoc } from "./misc";
 
-class TLSyncClient {
+export default class TLSyncClient {
   private socket: any;
   private user: string;
   private boardID: string;
-  private Log: object[];
   private boardState: Y.Doc;
+  private speculativeChanges: Uint8Array[];
+  private Log: {time: number, diffs: Uint8Array}[];
 
   constructor(
     user: string, 
@@ -19,6 +20,7 @@ class TLSyncClient {
     this.Log = [];
     this.user = user;
     this.boardID = boardID;
+    this.speculativeChanges = [];
     this.boardState = initialState;
 
     this.socket = new PartySocket({
@@ -27,13 +29,21 @@ class TLSyncClient {
       room: `TL_${this.boardID}`
     });
     
-    // Assuming the only meesage received are the changes
+    // Assuming the only message received are the changes
     this.socket.addEventListener("message", (e: any) => {
       let diff: Uint8Array = JSON.parse(e.data);
 
       // Apply patches to this board state
       Y.applyUpdate(this.boardState, diff);
     });
+
+    // Try to reconnect and send the speculative changes to the server
+    setInterval (() => {
+      if (this.speculativeChanges.length > 0) {
+        this.socket.reconnect();
+        this.socket.send(this.speculativeChanges[this.speculativeChanges.length - 1]);
+      }
+    }, 1000);
   }
 
   Update (diff: Uint8Array) {
@@ -49,11 +59,13 @@ class TLSyncClient {
       time: Date.now(),
       diffs: diff
     })
+
+    // The connection is closed: user is offline
+    if (this.socket.CLOSED == 3) {
+      this.speculativeChanges.push(diff);
+    }
+
   }
 }
-
-let ydoc1 = JSONToYDoc(JSON.stringify(board));
-let client1 = new TLSyncClient("user1", ydoc1, "1");
-let client2 = new TLSyncClient("user2", ydoc1, "1");
 
 
