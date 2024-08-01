@@ -1,57 +1,28 @@
-import type { TLShape } from "./structs";
+import * as Y from 'yjs'
 
-export function generateRandomId(length: number = 16): string {
-    const timestamp = Date.now().toString(36);
-    const randomPart = Math.random().toString(36).substring(2, 8);
-    return `${timestamp}-${randomPart}`.substring(0, length);
-}
-  
-  
-export function JSONToTLShape (jsonData: any): TLShape {
+export function JSONToYDoc (shapes: string) : Y.Doc{
+  let json;
+  try {
+    json = JSON.parse(shapes);
+  } catch (error) {
+    console.error('Invalid JSON string:', error);
+  }
 
-    const requiredProperties = [
-      'parentId', 'id', 
-      'typeName', 'type', 
-      'x', 'y', 'rotation', 
-      'index', 'opacity', 'isLocked', 
-      'props', 'meta'
-    ];
+  const ydoc = new Y.Doc()
+  const ymap = ydoc.getMap('root')
   
-    for (const prop of requiredProperties) {
-      if (!jsonData.hasOwnProperty(prop)) {
-        throw new Error(`Missing required property: ${prop}`);
+  function TLShapeToYDoc(obj : string, yparent : Y.Map<unknown>) {
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === 'object' && value !== null) {
+        const nestedYMap = new Y.Map()
+        TLShapeToYDoc(value, nestedYMap)
+        yparent.set(key, nestedYMap)
+      } else {
+        yparent.set(key, value)
       }
     }
-  
-    return {
-        parentId: jsonData.parentId || '',
-        id: jsonData.id || '',
-        typeName: jsonData.typeName || '',
-        type: jsonData.type || '',
-        x: jsonData.x || 0,
-        y: jsonData.y || 0,
-        rotation: jsonData.rotation || 0,
-        index: jsonData.index || '',
-        opacity: jsonData.opacity || 1,
-        isLocked: jsonData.isLocked || false,
-        props: {
-            w: jsonData.props?.w || 0,
-            h: jsonData.props?.h || 0,
-            geo: jsonData.props?.geo || '',
-            color: jsonData.props?.color || '',
-            labelColor: jsonData.props?.labelColor || '',
-            fill: jsonData.props?.fill || '',
-            dash: jsonData.props?.dash || '',
-            size: jsonData.props?.size || '',
-            font: jsonData.props?.font || '',
-            text: jsonData.props?.text || '',
-            align: jsonData.props?.align || '',
-            verticalAlign: jsonData.props?.verticalAlign || '',
-            growY: jsonData.props?.growY || 0,
-            url: jsonData.props?.url || '',
-        },
-        meta: {
-            boardID: jsonData.meta?.boardID || '',
-        },
-    };
+  }
+
+  TLShapeToYDoc(json, ymap)
+  return ydoc
 }
