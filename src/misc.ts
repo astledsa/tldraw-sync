@@ -1,6 +1,8 @@
 import * as Y from 'yjs'
+import board from "./mainBoard.json";
+import updatedboard from "./mockBoard.json"
 
-export function JSONToYDoc (shapes: string) : Y.Doc{
+function JSONToYDoc (shapes: string) : Y.Doc{
   let json;
   try {
     json = JSON.parse(shapes);
@@ -26,3 +28,8 @@ export function JSONToYDoc (shapes: string) : Y.Doc{
   TLShapeToYDoc(json, ymap)
   return ydoc
 }
+
+const mainDoc: Y.Doc = JSONToYDoc(JSON.stringify(board));
+const mockDoc: Y.Doc = JSONToYDoc(JSON.stringify(updatedboard))
+
+export {mainDoc, mockDoc}
