@@ -1,13 +1,13 @@
 import * as Y from 'yjs'
+import {mainDoc, mockDoc} from './misc';
 import PartySocket from "partysocket";
-import board from "./mainBaord.json";
-import { JSONToYDoc } from "./misc";
 
 export default class TLSyncClient {
   private socket: any;
   private user: string;
   private boardID: string;
   private boardState: Y.Doc;
+  private connectionStatus: number;
   private speculativeChanges: Uint8Array[];
   private Log: {time: number, diffs: Uint8Array}[];
 
@@ -20,6 +20,7 @@ export default class TLSyncClient {
     this.Log = [];
     this.user = user;
     this.boardID = boardID;
+    this.connectionStatus = 1;
     this.speculativeChanges = [];
     this.boardState = initialState;
 
@@ -31,28 +32,28 @@ export default class TLSyncClient {
     
     // Assuming the only message received are the changes
     this.socket.addEventListener("message", (e: any) => {
-      let diff: Uint8Array = JSON.parse(e.data);
+      if (typeof(e.data) == typeof("")) {
 
-      // Apply patches to this board state
-      Y.applyUpdate(this.boardState, diff);
+        this.connectionStatus = Number(e.data);
+        
+      } else {
+        let diff: Uint8Array = Uint8Array.from(e.data);
+
+        // Apply patches to this board state
+        Y.applyUpdate(this.boardState, diff);
+
+      }
     });
 
-    // Try to reconnect and send the speculative changes to the server
-    setInterval (() => {
-      if (this.speculativeChanges.length > 0) {
-        this.socket.reconnect();
-        this.socket.send(this.speculativeChanges[this.speculativeChanges.length - 1]);
-      }
-    }, 1000);
   }
 
   Update (diff: Uint8Array) {
-    
+
     // Apply the update to this doc
     Y.applyUpdate(this.boardState, diff);
 
     // Send the update to the server
-    this.socket.send(JSON.stringify(diff));
+    this.socket.send(diff.buffer);
 
     // Maintain a log of all the updates
     this.Log.push({
@@ -61,11 +62,23 @@ export default class TLSyncClient {
     })
 
     // The connection is closed: user is offline
-    if (this.socket.CLOSED == 3) {
+    if (this.connectionStatus == 0) {
       this.speculativeChanges.push(diff);
+    }
+
+    // Try to reconnect and send the offline changes (if any);
+    this.socket.reconnect();
+    if (this.speculativeChanges.length > 0) {
+      this.socket.send(this.speculativeChanges[this.speculativeChanges.length - 1]);
     }
 
   }
 }
+
+let client1 = new TLSyncClient ("user1", mainDoc, "1");
+let client2 = new TLSyncClient ("user2", mainDoc, "1");
+
+let diff: Uint8Array = Y.encodeStateAsUpdate(mainDoc, Y.encodeStateVector(mockDoc));
+client1.Update(diff);
 
 
